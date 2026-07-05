@@ -8,12 +8,13 @@ It is the third project in a three-repo story: it consumes the
 [cloudscraper-go](https://github.com/maarkN/cloudscraper-go) server to reach
 anti-bot protected sources.
 
-> **Status: M1 + M2.** The core is proven first: `HTML -> validated Job JSON`
+> **Status: M1 + M2 + M3.** The core is proven first: `HTML -> validated Job JSON`
 > (retry, cheap/strong model cascade, content-addressed cache, token cost), then
-> semantic ranking of jobs against a CV (hosted embeddings, Qdrant, explainable
-> score with visa filtering). Everything is tested offline: the LLM is mocked and
-> Qdrant runs in its in-process local mode, so CI needs no network or Docker. The
-> LangGraph agent, the API and the visa/eval work follow in M3-M5.
+> semantic ranking against a CV (hosted embeddings, Qdrant, explainable score with
+> visa filtering), then a **LangGraph** ingest pipeline (per-node failure
+> isolation, retry, checkpointing, cross-source dedup). Everything is tested
+> offline: the LLM is mocked and Qdrant runs in its in-process local mode, so CI
+> needs no network or Docker. The API and the visa/eval work follow in M4-M5.
 
 ## Why this design
 
@@ -42,10 +43,12 @@ uv run jobradar extract --html-file tests/fixtures/sample_job.html \
 To fetch a real anti-bot protected page, start the cloudscraper-go server in the
 sibling repo (`go run ./cmd/server`) and add `--anti-bot`.
 
-Rank a corpus of extracted jobs against a CV (embeddings need an `OPENAI_API_KEY`;
-Qdrant runs in local mode unless you set `QDRANT_URL`):
+Run the full flow — ingest a set of sources through the LangGraph pipeline into a
+job corpus, then rank it against a CV (both need an `OPENAI_API_KEY`; Qdrant runs
+in local mode unless you set `QDRANT_URL`):
 
 ```bash
+uv run jobradar ingest --sources-file examples/sources.json --out jobs.jsonl
 uv run jobradar rank --jobs-file jobs.jsonl --cv-file cv.md --require-visa
 ```
 
@@ -63,8 +66,10 @@ src/jobradar/
   index.py           # QdrantJobIndex (local mode in tests, server in prod)
   rank.py            # Ranker: similarity + explainable rule boosts
   store.py           # JSONL job corpus + exact-key dedup
+  sources.py         # Source config + per-source fetcher selection
+  graph/             # LangGraph ingest pipeline (fetch->parse->extract->index)
   fetch.py           # PlainFetcher + AntiBotFetcher (cloudscraper-go)
-  cli.py             # `jobradar extract` / `rank`
+  cli.py             # `jobradar extract` / `ingest` / `rank`
 tests/               # deterministic: LLM mocked, Qdrant local, no network
 ```
 
@@ -75,8 +80,10 @@ tests/               # deterministic: LLM mocked, Qdrant local, no network
 - [x] **M2 — Embed + Qdrant + match vs CV:** hosted embeddings, Qdrant index
   (local mode in tests), top-K ranking with explainable score + visa filter,
   CLI `rank`.
-- [ ] **M3 — LangGraph agent + more sources:** stateful graph with retry and
-  checkpointing, cross-source dedup.
+- [x] **M3 — LangGraph agent + more sources:** stateful ingest graph
+  (fetch->parse->extract->index) with per-node failure isolation, fetch retry,
+  a checkpointer and cross-source dedup (exact key + embedding similarity). CLI
+  `ingest`.
 - [ ] **M4 — API + Docker Compose:** FastAPI, `docker compose up`, CSV export.
 - [ ] **M5 — Visa filter + eval + dashboard:** visa classifier, labelled eval set
   with field-level accuracy, mini dashboard.

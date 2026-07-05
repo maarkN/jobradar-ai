@@ -64,5 +64,39 @@ class QdrantJobIndex:
         ).points
         return [(Job.model_validate(hit.payload), float(hit.score)) for hit in hits]
 
+    def all_jobs(
+        self,
+        *,
+        countries: Sequence[str] | None = None,
+        seniority: str | None = None,
+        visa: str | None = None,
+        remote: str | None = None,
+        limit: int = 1000,
+    ) -> list[Job]:
+        must: list[models.FieldCondition] = []
+        if countries:
+            must.append(
+                models.FieldCondition(key="country", match=models.MatchAny(any=list(countries)))
+            )
+        for key, value in (
+            ("seniority", seniority),
+            ("visa_sponsorship", visa),
+            ("remote", remote),
+        ):
+            if value:
+                must.append(models.FieldCondition(key=key, match=models.MatchValue(value=value)))
+        scroll_filter = models.Filter(must=must) if must else None
+
+        points, _ = self._client.scroll(
+            self._collection, scroll_filter=scroll_filter, limit=limit, with_payload=True
+        )
+        return [Job.model_validate(p.payload) for p in points]
+
+    def get_by_hash(self, content_hash: str) -> Job | None:
+        points = self._client.retrieve(
+            self._collection, ids=[_point_id(content_hash)], with_payload=True
+        )
+        return Job.model_validate(points[0].payload) if points else None
+
     def count(self) -> int:
         return self._client.count(self._collection).count

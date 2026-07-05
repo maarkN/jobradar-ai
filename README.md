@@ -8,13 +8,14 @@ It is the third project in a three-repo story: it consumes the
 [cloudscraper-go](https://github.com/maarkN/cloudscraper-go) server to reach
 anti-bot protected sources.
 
-> **Status: M1 + M2 + M3.** The core is proven first: `HTML -> validated Job JSON`
-> (retry, cheap/strong model cascade, content-addressed cache, token cost), then
-> semantic ranking against a CV (hosted embeddings, Qdrant, explainable score with
-> visa filtering), then a **LangGraph** ingest pipeline (per-node failure
-> isolation, retry, checkpointing, cross-source dedup). Everything is tested
-> offline: the LLM is mocked and Qdrant runs in its in-process local mode, so CI
-> needs no network or Docker. The API and the visa/eval work follow in M4-M5.
+> **Status: M1 - M4.** `HTML -> validated Job JSON` (retry, cheap/strong model
+> cascade, content-addressed cache, token cost) -> semantic ranking against a CV
+> (hosted embeddings, Qdrant, explainable score with visa filtering) -> a
+> **LangGraph** ingest pipeline (per-node failure isolation, retry, checkpointing,
+> cross-source dedup) -> a **FastAPI** service + `docker compose up` + CSV export.
+> Everything is tested offline: the LLM is mocked and Qdrant runs in its in-process
+> local mode, so CI needs no network or Docker. The visa classifier, a labelled
+> eval set and a dashboard follow in M5.
 
 ## Why this design
 
@@ -68,10 +69,25 @@ src/jobradar/
   store.py           # JSONL job corpus + exact-key dedup
   sources.py         # Source config + per-source fetcher selection
   graph/             # LangGraph ingest pipeline (fetch->parse->extract->index)
+  api/               # FastAPI app, deps (overridable), run registry
+  export.py          # CSV export (applications-tracker format)
   fetch.py           # PlainFetcher + AntiBotFetcher (cloudscraper-go)
-  cli.py             # `jobradar extract` / `ingest` / `rank`
+  cli.py             # extract / ingest / rank / export / serve
 tests/               # deterministic: LLM mocked, Qdrant local, no network
 ```
+
+## API
+
+`jobradar serve` (or `docker compose up`) exposes:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | liveness + indexed job count |
+| `POST /runs` / `GET /runs/{id}` | trigger a background ingest and poll it |
+| `GET /jobs` | list/filter indexed jobs (country, seniority, visa, remote) |
+| `GET /jobs/{content_hash}` | one job |
+| `POST /rank` | rank the corpus against a CV |
+| `POST /export/csv` | top matches as a tracker-ready CSV |
 
 ## Roadmap
 
@@ -84,7 +100,8 @@ tests/               # deterministic: LLM mocked, Qdrant local, no network
   (fetch->parse->extract->index) with per-node failure isolation, fetch retry,
   a checkpointer and cross-source dedup (exact key + embedding similarity). CLI
   `ingest`.
-- [ ] **M4 — API + Docker Compose:** FastAPI, `docker compose up`, CSV export.
+- [x] **M4 — API + Docker Compose:** FastAPI (runs, jobs, rank, CSV export),
+  `docker compose up` (app + Qdrant), CLI `export` / `serve`.
 - [ ] **M5 — Visa filter + eval + dashboard:** visa classifier, labelled eval set
   with field-level accuracy, mini dashboard.
 

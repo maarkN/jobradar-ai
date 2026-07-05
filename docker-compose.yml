@@ -1,6 +1,5 @@
-# Qdrant for real runs. Tests use qdrant-client's in-process local mode, so this
-# is only needed when you index a real corpus. Point the app at it with
-# QDRANT_URL=http://127.0.0.1:6333 in your .env.
+# Full stack: the API + Qdrant. `docker compose up` then hit http://localhost:8000.
+# Tests don't need this (qdrant-client runs in-process local mode).
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -9,6 +8,18 @@ services:
       - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    env_file:
+      - .env
+    depends_on:
+      - qdrant
+    command: ["jobradar", "serve", "--host", "0.0.0.0", "--port", "8000"]
 
 volumes:
   qdrant_data:

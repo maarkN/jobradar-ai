@@ -12,6 +12,7 @@ import typer
 from jobradar.cache import ExtractionCache, NullCache
 from jobradar.config import load_settings
 from jobradar.embeddings import OpenAIEmbedder
+from jobradar.export import ranked_to_csv
 from jobradar.extract import Extractor, html_to_text
 from jobradar.fetch import AntiBotFetcher, PlainFetcher
 from jobradar.graph import IngestPipeline
@@ -113,6 +114,43 @@ def ingest(
         f"embed={json.dumps(embedder.cost.summary())}",
         err=True,
     )
+
+
+@app.command()
+def export(
+    jobs_file: Annotated[Path, typer.Option(help="JSONL corpus of extracted Jobs")],
+    cv_file: Annotated[Path, typer.Option(help="CV as markdown/plain text")],
+    out: Annotated[Path, typer.Option(help="CSV output (aplicacoes-tracker format)")],
+    top_k: Annotated[int, typer.Option()] = 20,
+    country: Annotated[list[str] | None, typer.Option()] = None,
+    require_visa: Annotated[bool, typer.Option()] = True,
+) -> None:
+    """Rank a corpus against a CV and write the top matches as a tracker-ready CSV."""
+    settings = load_settings()
+    countries = country or ["IE", "DE", "NL", "CA"]
+
+    embedder = OpenAIEmbedder(settings)
+    ranker = Ranker(embedder, QdrantJobIndex(settings, embedder.dim))
+    ranker.index_jobs(load_jobs_jsonl(jobs_file))
+    ranked = ranker.rank(
+        cv_file.read_text(encoding="utf-8"),
+        top_k=top_k,
+        countries=countries,
+        require_visa=require_visa,
+    )
+    out.write_text(ranked_to_csv(ranked), encoding="utf-8")
+    typer.echo(f"wrote {len(ranked)} rows -> {out}")
+
+
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option()] = "127.0.0.1",
+    port: Annotated[int, typer.Option()] = 8000,
+) -> None:
+    """Run the FastAPI server."""
+    import uvicorn
+
+    uvicorn.run("jobradar.api:app", host=host, port=port)
 
 
 @app.command()

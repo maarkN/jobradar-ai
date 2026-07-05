@@ -15,6 +15,8 @@ _PRICES: dict[str, tuple[float, float]] = {
     "claude-opus-4-8": (5.0, 25.0),
     "gpt-5-mini": (0.25, 2.0),
     "gpt-5": (1.25, 10.0),
+    "text-embedding-3-small": (0.02, 0.0),
+    "text-embedding-3-large": (0.13, 0.0),
 }
 
 

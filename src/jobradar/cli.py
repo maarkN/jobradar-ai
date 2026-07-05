@@ -11,9 +11,13 @@ import typer
 
 from jobradar.cache import ExtractionCache, NullCache
 from jobradar.config import load_settings
+from jobradar.embeddings import OpenAIEmbedder
 from jobradar.extract import Extractor, html_to_text
 from jobradar.fetch import AntiBotFetcher, PlainFetcher
+from jobradar.index import QdrantJobIndex
 from jobradar.llm import get_provider
+from jobradar.rank import Ranker
+from jobradar.store import load_jobs_jsonl
 
 app = typer.Typer(add_completion=False, help="JobRadar AI: scrape, extract and rank jobs.")
 
@@ -45,6 +49,34 @@ def extract(
 
     typer.echo(json.dumps(job.model_dump(mode="json"), indent=2, ensure_ascii=False))
     typer.echo(f"\ncost: {json.dumps(extractor.cost.summary())}", err=True)
+
+
+@app.command()
+def rank(
+    jobs_file: Annotated[Path, typer.Option(help="JSONL corpus of extracted Jobs")],
+    cv_file: Annotated[Path, typer.Option(help="CV as markdown/plain text")],
+    top_k: Annotated[int, typer.Option(help="How many matches to return")] = 20,
+    country: Annotated[list[str] | None, typer.Option(help="Target countries (repeatable)")] = None,
+    require_visa: Annotated[bool, typer.Option(help="Only visa-sponsoring roles")] = True,
+) -> None:
+    """Embed a job corpus + CV, index in Qdrant, and print the top CV matches."""
+    settings = load_settings()
+    countries = country or ["IE", "DE", "NL", "CA"]
+
+    jobs = load_jobs_jsonl(jobs_file)
+    cv_text = cv_file.read_text(encoding="utf-8")
+
+    embedder = OpenAIEmbedder(settings)
+    ranker = Ranker(embedder, QdrantJobIndex(settings, embedder.dim))
+    ranker.index_jobs(jobs)
+    results = ranker.rank(cv_text, top_k=top_k, countries=countries, require_visa=require_visa)
+
+    for r in results:
+        typer.echo(
+            f"{r.match_score:.2f}  {r.job.title} @ {r.job.company} "
+            f"({r.job.country or '?'})  [{', '.join(r.match_reasons)}]"
+        )
+    typer.echo(f"\nindexed {len(jobs)} jobs, cost: {json.dumps(embedder.cost.summary())}", err=True)
 
 
 @app.command()

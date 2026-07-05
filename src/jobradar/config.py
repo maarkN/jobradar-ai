@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     openai_model_fast: str = "gpt-5-mini"
     openai_model_strong: str = "gpt-5"
 
+    # --- Embeddings (hosted, OpenAI) ---
+    openai_embedding_model: str = "text-embedding-3-small"
+    embedding_dim: int = 1536
+
+    # --- Vector store (Qdrant) ---
+    # None -> in-process local mode (":memory:"), so tests need no server.
+    qdrant_url: str | None = None
+    qdrant_collection: str = "jobs"
+
     # Max output tokens for an extraction call.
     extract_max_tokens: int = 1500
     # How many times to retry a failed extraction on the fast model before

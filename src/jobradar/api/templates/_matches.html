@@ -1,0 +1,20 @@
+{% if matches %}
+<table>
+  <thead>
+    <tr><th>Score</th><th>Role</th><th>Company</th><th>Country</th><th>Why</th></tr>
+  </thead>
+  <tbody>
+    {% for m in matches %}
+    <tr>
+      <td class="score">{{ "%.2f"|format(m.match_score) }}</td>
+      <td>{{ m.job.title }}</td>
+      <td>{{ m.job.company }}</td>
+      <td>{{ m.job.country or "?" }}</td>
+      <td class="reasons">{{ m.match_reasons | join(", ") }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No matches found.</p>
+{% endif %}

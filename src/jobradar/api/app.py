@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from jobradar.api.deps import (
     get_embedder,
@@ -23,6 +26,8 @@ from jobradar.index import QdrantJobIndex
 from jobradar.models import Job, RankedJob
 from jobradar.rank import Ranker
 from jobradar.sources import FetchFn, Source
+
+_templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 def create_app() -> FastAPI:
@@ -116,6 +121,20 @@ def create_app() -> FastAPI:
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=matches.csv"},
         )
+
+    @app.get("/", response_class=HTMLResponse)
+    def dashboard(request: Request) -> HTMLResponse:
+        return _templates.TemplateResponse(request, "dashboard.html")
+
+    @app.post("/dashboard/rank", response_class=HTMLResponse)
+    def dashboard_rank(
+        request: Request,
+        cv_text: Annotated[str, Form()],
+        embedder: Annotated[Embedder, Depends(get_embedder)],
+        index: Annotated[QdrantJobIndex, Depends(get_index)],
+    ) -> HTMLResponse:
+        matches = Ranker(embedder, index).rank(cv_text, top_k=10)
+        return _templates.TemplateResponse(request, "_matches.html", {"matches": matches})
 
     return app
 

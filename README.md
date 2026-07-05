@@ -8,14 +8,15 @@ It is the third project in a three-repo story: it consumes the
 [cloudscraper-go](https://github.com/maarkN/cloudscraper-go) server to reach
 anti-bot protected sources.
 
-> **Status: M1 - M4.** `HTML -> validated Job JSON` (retry, cheap/strong model
-> cascade, content-addressed cache, token cost) -> semantic ranking against a CV
-> (hosted embeddings, Qdrant, explainable score with visa filtering) -> a
-> **LangGraph** ingest pipeline (per-node failure isolation, retry, checkpointing,
-> cross-source dedup) -> a **FastAPI** service + `docker compose up` + CSV export.
-> Everything is tested offline: the LLM is mocked and Qdrant runs in its in-process
-> local mode, so CI needs no network or Docker. The visa classifier, a labelled
-> eval set and a dashboard follow in M5.
+> **Status: the roadmap (M1-M5) is implemented and CI-green.** `HTML -> validated
+> Job JSON` (retry, cheap/strong model cascade, content-addressed cache, token
+> cost) -> semantic ranking against a CV (hosted embeddings, Qdrant, explainable
+> score with visa filtering) -> a **LangGraph** ingest pipeline (per-node failure
+> isolation, retry, checkpointing, cross-source dedup) -> a **FastAPI** service +
+> HTMX dashboard + `docker compose up` + CSV export -> a dedicated visa classifier
+> and an **evaluation harness** (`eval`) reporting field-level accuracy against a
+> labelled gold set. Everything is tested offline: the LLM is mocked and Qdrant
+> runs in its in-process local mode, so CI needs no network or Docker.
 
 ## Why this design
 
@@ -69,10 +70,13 @@ src/jobradar/
   store.py           # JSONL job corpus + exact-key dedup
   sources.py         # Source config + per-source fetcher selection
   graph/             # LangGraph ingest pipeline (fetch->parse->extract->index)
-  api/               # FastAPI app, deps (overridable), run registry
+  api/               # FastAPI app + HTMX dashboard, deps (overridable), runs
   export.py          # CSV export (applications-tracker format)
+  visa.py            # dedicated rule-based visa-sponsorship classifier
+  eval.py            # field-level accuracy against a labelled gold set
   fetch.py           # PlainFetcher + AntiBotFetcher (cloudscraper-go)
-  cli.py             # extract / ingest / rank / export / serve
+  cli.py             # extract / ingest / rank / export / eval / serve
+evalset/             # labelled gold cases (drop real, hand-labelled ones in)
 tests/               # deterministic: LLM mocked, Qdrant local, no network
 ```
 
@@ -88,6 +92,7 @@ tests/               # deterministic: LLM mocked, Qdrant local, no network
 | `GET /jobs/{content_hash}` | one job |
 | `POST /rank` | rank the corpus against a CV |
 | `POST /export/csv` | top matches as a tracker-ready CSV |
+| `GET /` | HTMX dashboard: paste a CV, see the top matches |
 
 ## Roadmap
 
@@ -102,7 +107,20 @@ tests/               # deterministic: LLM mocked, Qdrant local, no network
   `ingest`.
 - [x] **M4 — API + Docker Compose:** FastAPI (runs, jobs, rank, CSV export),
   `docker compose up` (app + Qdrant), CLI `export` / `serve`.
-- [ ] **M5 — Visa filter + eval + dashboard:** visa classifier, labelled eval set
-  with field-level accuracy, mini dashboard.
+- [x] **M5 — Visa filter + eval + dashboard:** a dedicated rule-based visa
+  classifier layered on the extraction, an evaluation harness (`jobradar eval`)
+  reporting field-level accuracy against a labelled gold set, and an HTMX
+  dashboard at `/`.
+
+## Measuring extraction quality
+
+```bash
+uv run jobradar eval --evalset-dir evalset
+```
+
+Reports per-field accuracy on the critical fields (`title`, `company`,
+`seniority`, `visa_sponsorship`, `remote`) against the labelled gold cases in
+`evalset/`. Add real, hand-labelled postings to make the number meaningful for
+your own sources.
 
 MIT licensed.

@@ -8,11 +8,12 @@ It is the third project in a three-repo story: it consumes the
 [cloudscraper-go](https://github.com/maarkN/cloudscraper-go) server to reach
 anti-bot protected sources.
 
-> **Status: M1 (extraction core).** The part the whole project rests on is proven
-> first: `HTML -> validated Job JSON`, with retry, a cheap/strong model cascade,
-> a content-addressed cache and token cost accounting. Everything is tested
-> offline with the LLM mocked. Embeddings, Qdrant, the LangGraph agent, the API
-> and the visa/eval work follow in M2-M5.
+> **Status: M1 + M2.** The core is proven first: `HTML -> validated Job JSON`
+> (retry, cheap/strong model cascade, content-addressed cache, token cost), then
+> semantic ranking of jobs against a CV (hosted embeddings, Qdrant, explainable
+> score with visa filtering). Everything is tested offline: the LLM is mocked and
+> Qdrant runs in its in-process local mode, so CI needs no network or Docker. The
+> LangGraph agent, the API and the visa/eval work follow in M3-M5.
 
 ## Why this design
 
@@ -41,6 +42,13 @@ uv run jobradar extract --html-file tests/fixtures/sample_job.html \
 To fetch a real anti-bot protected page, start the cloudscraper-go server in the
 sibling repo (`go run ./cmd/server`) and add `--anti-bot`.
 
+Rank a corpus of extracted jobs against a CV (embeddings need an `OPENAI_API_KEY`;
+Qdrant runs in local mode unless you set `QDRANT_URL`):
+
+```bash
+uv run jobradar rank --jobs-file jobs.jsonl --cv-file cv.md --require-visa
+```
+
 ## Layout
 
 ```
@@ -51,17 +59,22 @@ src/jobradar/
   cache.py           # content-addressed extraction cache
   llm/               # provider protocol + Anthropic/OpenAI + factory
   extract/           # html_to_text, prompt, Extractor (retry + cascade)
+  embeddings.py      # hosted (OpenAI) embedder behind a protocol
+  index.py           # QdrantJobIndex (local mode in tests, server in prod)
+  rank.py            # Ranker: similarity + explainable rule boosts
+  store.py           # JSONL job corpus + exact-key dedup
   fetch.py           # PlainFetcher + AntiBotFetcher (cloudscraper-go)
-  cli.py             # `jobradar extract`
-tests/               # deterministic, LLM mocked, no network
+  cli.py             # `jobradar extract` / `rank`
+tests/               # deterministic: LLM mocked, Qdrant local, no network
 ```
 
 ## Roadmap
 
 - [x] **M1 — Ingest + Extract:** clean text, LLM extract, validate, retry,
   cascade, cache, cost; CLI `extract`.
-- [ ] **M2 — Embed + Qdrant + match vs CV:** hosted embeddings, vector index,
-  top-K ranking, CLI `rank`.
+- [x] **M2 — Embed + Qdrant + match vs CV:** hosted embeddings, Qdrant index
+  (local mode in tests), top-K ranking with explainable score + visa filter,
+  CLI `rank`.
 - [ ] **M3 — LangGraph agent + more sources:** stateful graph with retry and
   checkpointing, cross-source dedup.
 - [ ] **M4 — API + Docker Compose:** FastAPI, `docker compose up`, CSV export.

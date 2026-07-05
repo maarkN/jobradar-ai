@@ -75,6 +75,29 @@ class FakeEmbedder:
         return [x / norm for x in raw]
 
 
+class FakeFetcher:
+    """A (source_id, url) -> html callable; raises for urls marked to fail."""
+
+    def __init__(self, htmls: dict[str, str], fail: set[str] | None = None) -> None:
+        self._htmls = htmls
+        self._fail = fail or set()
+
+    def __call__(self, source_id: str, url: str) -> str:
+        if url in self._fail:
+            raise RuntimeError(f"boom fetching {url}")
+        return self._htmls[url]
+
+
+class FakeExtractor:
+    """Maps a url to a preset Job, ignoring the text (SupportsExtract-compatible)."""
+
+    def __init__(self, by_url: dict[str, Job]) -> None:
+        self._by_url = by_url
+
+    def extract(self, clean_text: str, *, source: str, url: str, fetched_at: datetime) -> Job:
+        return self._by_url[url]
+
+
 def _job(
     title: str, company: str, country: str, stack: list[str], visa: VisaSponsorship, sen: Seniority
 ) -> Job:

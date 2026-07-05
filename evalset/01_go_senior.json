@@ -1,0 +1,10 @@
+{
+  "html": "<html><body><h1>Senior Go Engineer</h1><p>Acme Cloud - Dublin, Ireland (Hybrid)</p><p>We are hiring a senior backend engineer in Go. 5+ years required. We offer visa sponsorship and a relocation package (Critical Skills Permit).</p></body></html>",
+  "gold": {
+    "title": "Senior Go Engineer",
+    "company": "Acme Cloud",
+    "seniority": "senior",
+    "visa_sponsorship": "yes",
+    "remote": "hybrid"
+  }
+}

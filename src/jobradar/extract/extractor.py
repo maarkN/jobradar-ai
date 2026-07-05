@@ -21,6 +21,7 @@ from jobradar.cost import CostAccumulator
 from jobradar.extract.prompt import SYSTEM, build_user_prompt
 from jobradar.llm.base import LLMProvider, Tier
 from jobradar.models import ExtractedJob, Job, content_hash
+from jobradar.visa import refine_visa
 
 log = structlog.get_logger(__name__)
 
@@ -71,6 +72,8 @@ class Extractor:
             fetched_at=fetched_at,
             content_hash=content_hash(extracted.company, extracted.title, extracted.location),
         )
+        # Refine the critical visa field with the dedicated rule-based classifier.
+        job.visa_sponsorship = refine_visa(extracted)
         self._cache.set(key, job.model_dump(mode="json"))
         return job
 

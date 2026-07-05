@@ -1,0 +1,10 @@
+{
+  "html": "<html><body><h1>Staff Platform Engineer</h1><p>Gamma Labs - Remote (EU)</p><p>Staff-level engineer for our Kubernetes platform. Fully remote within the EU.</p></body></html>",
+  "gold": {
+    "title": "Staff Platform Engineer",
+    "company": "Gamma Labs",
+    "seniority": "staff",
+    "visa_sponsorship": "unknown",
+    "remote": "remote"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "html": "<html><body><h1>Frontend Developer</h1><p>Beta Corp - Berlin, Germany (On-site)</p><p>Mid-level React developer. Applicants must already have the right to work in Germany; we do not provide visa sponsorship.</p></body></html>",
+  "gold": {
+    "title": "Frontend Developer",
+    "company": "Beta Corp",
+    "seniority": "mid",
+    "visa_sponsorship": "no",
+    "remote": "onsite"
+  }
+}

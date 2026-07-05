@@ -14,10 +14,12 @@ from jobradar.config import load_settings
 from jobradar.embeddings import OpenAIEmbedder
 from jobradar.extract import Extractor, html_to_text
 from jobradar.fetch import AntiBotFetcher, PlainFetcher
+from jobradar.graph import IngestPipeline
 from jobradar.index import QdrantJobIndex
 from jobradar.llm import get_provider
 from jobradar.rank import Ranker
-from jobradar.store import load_jobs_jsonl
+from jobradar.sources import load_sources, make_fetch_fn
+from jobradar.store import load_jobs_jsonl, save_jobs_jsonl
 
 app = typer.Typer(add_completion=False, help="JobRadar AI: scrape, extract and rank jobs.")
 
@@ -77,6 +79,40 @@ def rank(
             f"({r.job.country or '?'})  [{', '.join(r.match_reasons)}]"
         )
     typer.echo(f"\nindexed {len(jobs)} jobs, cost: {json.dumps(embedder.cost.summary())}", err=True)
+
+
+@app.command()
+def ingest(
+    sources_file: Annotated[
+        Path, typer.Option(help="JSON list of sources (id, seed_urls, anti_bot)")
+    ],
+    out: Annotated[Path, typer.Option(help="Write indexed jobs as JSONL (feeds `rank`)")],
+) -> None:
+    """Run the LangGraph pipeline over the configured sources and index the jobs."""
+    settings = load_settings()
+    sources = load_sources(sources_file)
+
+    provider = get_provider(settings)
+    extractor = Extractor(provider, ExtractionCache(settings.cache_dir), settings)
+    embedder = OpenAIEmbedder(settings)
+    pipeline = IngestPipeline(
+        fetch_fn=make_fetch_fn(sources, settings),
+        extractor=extractor,
+        embedder=embedder,
+        index=QdrantJobIndex(settings, embedder.dim),
+    )
+
+    result = pipeline.run(sources)
+    save_jobs_jsonl(out, result.indexed)
+
+    typer.echo(f"ingest: {json.dumps(result.summary())} -> {out}")
+    for src, url, msg in result.errors:
+        typer.echo(f"  error [{src}] {url}: {msg}", err=True)
+    typer.echo(
+        f"cost: extract={json.dumps(extractor.cost.summary())} "
+        f"embed={json.dumps(embedder.cost.summary())}",
+        err=True,
+    )
 
 
 @app.command()

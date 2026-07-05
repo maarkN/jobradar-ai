@@ -1,0 +1,4 @@
+[
+  { "id": "demo", "seed_urls": ["https://example.com/job/1"], "anti_bot": false },
+  { "id": "irishjobs", "seed_urls": ["https://www.irishjobs.ie/job/12345"], "anti_bot": true }
+]

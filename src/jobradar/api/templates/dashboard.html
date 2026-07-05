@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobRadar AI</title>
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { margin-bottom: 4px; }
+    p.sub { color: #666; margin-top: 0; }
+    textarea { width: 100%; height: 150px; padding: 10px; font: inherit; box-sizing: border-box; }
+    button { margin-top: 10px; padding: 8px 18px; font-weight: 600; cursor: pointer; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border-bottom: 1px solid #e2e2e2; padding: 8px 10px; text-align: left; font-size: 14px; vertical-align: top; }
+    th { color: #666; font-weight: 600; }
+    .score { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .reasons { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>JobRadar AI</h1>
+  <p class="sub">Paste your CV to see the top matching, visa-sponsoring roles.</p>
+  <form hx-post="/dashboard/rank" hx-target="#matches" hx-swap="innerHTML" hx-indicator="#loading">
+    <textarea name="cv_text" placeholder="Paste your CV here..."></textarea>
+    <div>
+      <button type="submit">Rank</button>
+      <span id="loading" class="htmx-indicator">ranking...</span>
+    </div>
+  </form>
+  <div id="matches"></div>
+</body>
+</html>

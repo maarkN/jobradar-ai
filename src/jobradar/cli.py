@@ -12,6 +12,7 @@ import typer
 from jobradar.cache import ExtractionCache, NullCache
 from jobradar.config import load_settings
 from jobradar.embeddings import OpenAIEmbedder
+from jobradar.eval import evaluate, load_evalset
 from jobradar.export import ranked_to_csv
 from jobradar.extract import Extractor, html_to_text
 from jobradar.fetch import AntiBotFetcher, PlainFetcher
@@ -151,6 +152,26 @@ def serve(
     import uvicorn
 
     uvicorn.run("jobradar.api:app", host=host, port=port)
+
+
+@app.command(name="eval")
+def eval_cmd(
+    evalset_dir: Annotated[Path, typer.Option(help="Directory of labelled JSON cases")] = Path(
+        "evalset"
+    ),
+) -> None:
+    """Measure extraction field-level accuracy against the labelled gold set."""
+    settings = load_settings()
+    extractor = Extractor(get_provider(settings), NullCache(), settings)
+
+    report = evaluate(load_evalset(evalset_dir), extractor)
+    typer.echo(f"cases: {report.n}")
+    for name, acc in report.field_accuracy().items():
+        typer.echo(f"  {name:18s} {acc:6.1%}")
+    typer.echo(f"  {'overall':18s} {report.overall():6.1%}")
+    for case, field_name, gold, pred in report.mistakes:
+        typer.echo(f"  miss [{case}] {field_name}: gold={gold} pred={pred}", err=True)
+    typer.echo(f"cost: {json.dumps(extractor.cost.summary())}", err=True)
 
 
 @app.command()
